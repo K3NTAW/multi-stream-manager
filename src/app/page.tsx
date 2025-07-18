@@ -3,16 +3,22 @@ import { StreamInfoForm } from "@/components/stream-info-form";
 import { SignInButton } from "@/components/auth-buttons";
 import { getServerSession } from "next-auth";
 import { Navbar } from "@/components/navbar";
+import { Container } from "@/components/ui/container";
+import { Hero, HeroSubtitle, HeroTitle } from "@/components/ui/hero";
 
 export default async function Home() {
   const session = await getServerSession();
 
   if (!session) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-900 text-white">
-        <h1 className="text-4xl font-bold mb-4">Stream Manager</h1>
-        <p className="mb-8">Please log in to continue</p>
-        <SignInButton />
+      <main className="flex min-h-screen flex-col items-center justify-center p-24">
+        <Hero>
+          <HeroTitle>Stream Manager</HeroTitle>
+          <HeroSubtitle>
+            Your all-in-one tool for managing your stream.
+          </HeroSubtitle>
+          <SignInButton />
+        </Hero>
       </main>
     );
   }
@@ -20,11 +26,8 @@ export default async function Home() {
   return (
     <>
       <Navbar />
-      <main className="flex h-screen bg-gray-900 text-white">
-        <div className="w-1/3">
-          <StreamInfoForm />
-        </div>
-        <div className="w-2/3">
+      <main className="flex-grow flex flex-col p-8 overflow-hidden">
+        <div className="flex-grow rounded-xl border bg-card text-card-foreground shadow flex flex-col overflow-hidden">
           <ChatFeed />
         </div>
       </main>
