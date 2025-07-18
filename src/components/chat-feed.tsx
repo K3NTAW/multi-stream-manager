@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useSession } from 'next-auth/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChatMessage as ChatMessageType } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -12,6 +13,7 @@ import { ExternalLink, Wifi, WifiOff, Trash2 } from 'lucide-react';
 const MAX_MESSAGES = 1000;
 
 export function ChatFeed() {
+  const { data: session } = useSession();
   const [messages, setMessages] = useState<ChatMessageType[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -25,11 +27,13 @@ export function ChatFeed() {
     measureElement: (element) => element.getBoundingClientRect().height,
   });
 
-  const connect = () => {
-    ws.current = new WebSocket('ws://localhost:3001');
+  const connect = useCallback(() => {
+    if (!session?.user?.name) return;
+    ws.current = new WebSocket(
+      `ws://localhost:3001?channel=${session.user.name}`
+    );
 
     ws.current.onopen = () => {
-      console.log('Connected to WebSocket server');
       setIsConnected(true);
     };
 
@@ -43,23 +47,25 @@ export function ChatFeed() {
     };
 
     ws.current.onclose = () => {
-      console.log('Disconnected from WebSocket server');
       setIsConnected(false);
     };
-  };
+  }, [session?.user?.name]);
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     if (ws.current) {
       ws.current.close();
     }
-  };
+  }, []);
 
   useEffect(() => {
     const storedMessages = localStorage.getItem('chat_messages');
     if (storedMessages) {
       setMessages(JSON.parse(storedMessages));
     }
-    connect();
+
+    if (session?.user?.name) {
+      connect();
+    }
 
     const handleStorageChange = (event: StorageEvent) => {
       if (event.key === 'chat_messages') {
@@ -77,7 +83,7 @@ export function ChatFeed() {
       disconnect();
       window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [session?.user?.name, connect, disconnect]);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -109,7 +115,9 @@ export function ChatFeed() {
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Unified Chat</CardTitle>
+        <CardTitle>
+          Unified Chat{session?.user?.name ? `: ${session.user.name}` : ""}
+        </CardTitle>
         <div className="flex items-center gap-2">
           {isConnected ? (
             <Button variant="ghost" size="icon" onClick={disconnect}>

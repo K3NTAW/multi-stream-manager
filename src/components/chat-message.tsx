@@ -1,5 +1,7 @@
+import { useState } from "react";
 import { ChatMessage as ChatMessageType } from "@/lib/types";
 import { Badge } from "./ui/badge";
+import { UserProfileCard } from "./user-profile-card";
 
 const chatColors = [
   "#FF0000",
@@ -36,6 +38,8 @@ function assignUserColor(username: string): string {
 }
 
 export function ChatMessage({ message }: { message: ChatMessageType }) {
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
   const getPlatformBadgeVariant = (
     platform: ChatMessageType["platform"]
   ): "twitch" | "youtube" | "kick" | "outline" => {
@@ -83,14 +87,25 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
         >
           {message.platform}
         </Badge>
-        <span className="font-semibold" style={{ color: userColor }}>
+        <button
+          className="font-semibold hover:underline"
+          style={{ color: userColor }}
+          onClick={() => setIsProfileOpen(true)}
+        >
           {message.sender}
-        </span>
+        </button>
         <span>: </span>
         <span className="message-content">
           {renderMessage(message.message)}
         </span>
       </div>
+      <UserProfileCard
+        username={message.sender}
+        platform={message.platform}
+        channel={message.channel}
+        isOpen={isProfileOpen}
+        onOpenChange={setIsProfileOpen}
+      />
     </div>
   );
 } 

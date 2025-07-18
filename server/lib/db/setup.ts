@@ -29,6 +29,17 @@ async function setup() {
 		);
 	`;
 
+	await sql`
+		CREATE TABLE chat_messages (
+			id SERIAL PRIMARY KEY,
+			platform TEXT NOT NULL,
+			channel TEXT NOT NULL,
+			sender TEXT NOT NULL,
+			message TEXT NOT NULL,
+			timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+	`;
+
 	console.log("Database setup complete.");
 	process.exit(0);
 }

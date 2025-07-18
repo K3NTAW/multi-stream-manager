@@ -11,7 +11,8 @@ export const authOptions: NextAuthOptions = {
 			clientSecret: env.TWITCH_CLIENT_SECRET,
 			authorization: {
 				params: {
-					scope: 'openid user:read:email channel:manage:broadcast',
+					scope:
+						'openid user:read:email channel:manage:broadcast user:read:broadcast channel:read:subscriptions moderator:read:followers user:read:follows',
 				},
 			},
 		}),
@@ -27,6 +28,9 @@ export const authOptions: NextAuthOptions = {
 	secret: env.AUTH_SECRET,
 	callbacks: {
 		async jwt({ token, account, profile }) {
+			if (account) {
+				console.log("JWT Callback Account:", JSON.stringify(account, null, 2));
+			}
 			if (account && profile) {
 				token.accessToken = account.access_token;
 				token.id = profile.sub;

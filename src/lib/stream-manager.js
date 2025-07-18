@@ -3,10 +3,8 @@ const { io } = require('socket.io-client');
 const { env } = require('../../src/lib/env');
 
 class StreamManager {
-  twitchConnected = false;
-  youtubeConnected = false;
-  kickConnected = false;
-  twitchClient = null;
+  twitchClients = {}; // Key: channel, Value: tmi.Client
+  kickSockets = {}; // Key: channel, Value: socket
   onMessageCallback = null;
 
   constructor() {
@@ -14,10 +12,15 @@ class StreamManager {
   }
 
   connectTwitch(channel, token) {
+    if (this.twitchClients[channel]) {
+      console.log(`Already connected to Twitch channel: ${channel}`);
+      return;
+    }
+
     console.log(`Connecting to Twitch channel: ${channel}`);
 
-    this.twitchClient = new tmi.Client({
-      options: { debug: true },
+    const twitchClient = new tmi.Client({
+      options: { debug: false },
       connection: {
         secure: true,
         reconnect: true,
@@ -29,13 +32,14 @@ class StreamManager {
       channels: [channel],
     });
 
-    this.twitchClient.connect();
+    twitchClient.connect().catch(console.error);
 
-    this.twitchClient.on('message', (channel, tags, message, self) => {
+    twitchClient.on('message', (ch, tags, message, self) => {
       if (self) return;
 
       const chatMessage = {
         platform: 'Twitch',
+        channel: ch.replace('#', ''),
         sender: tags['display-name'] || 'anonymous',
         message,
         timestamp: new Date(),
@@ -46,18 +50,30 @@ class StreamManager {
       }
     });
 
-    this.twitchConnected = true;
+    this.twitchClients[channel] = twitchClient;
   }
 
-  async connectKick(channelName) {
-    console.log(`Fetching chatroom ID for Kick channel: ${channelName}`);
+  disconnectTwitch(channel) {
+    if (this.twitchClients[channel]) {
+      console.log(`Disconnecting from Twitch channel: ${channel}`);
+      this.twitchClients[channel].disconnect();
+      delete this.twitchClients[channel];
+    }
+  }
+
+  async connectKick(channel) {
+    if (this.kickSockets[channel]) {
+      console.log(`Already connected to Kick channel: ${channel}`);
+      return;
+    }
+    console.log(`Fetching chatroom ID for Kick channel: ${channel}`);
     try {
-      const response = await fetch(`https://kick.com/api/v2/channels/${channelName}/chatroom`);
+      const response = await fetch(`https://kick.com/api/v2/channels/${channel}/chatroom`);
       const data = await response.json();
       const chatroomId = data?.id;
 
       if (!chatroomId) {
-        console.error(`Could not find chatroom for Kick channel: ${channelName}`);
+        console.error(`Could not find chatroom for Kick channel: ${channel}`);
         return;
       }
 
@@ -65,10 +81,9 @@ class StreamManager {
         transports: ["websocket"],
       });
 
-      socket.on("connect", () => {
-        console.log("Connected to Kick chat");
-
-        socket.emit("join", {
+      socket.on('connect', () => {
+        console.log(`Connected to Kick chat for ${channel}`);
+        socket.emit('join', {
           room: `chatroom:${chatroomId}`,
         });
       });
@@ -77,6 +92,7 @@ class StreamManager {
         const messageData = JSON.parse(data);
         const chatMessage = {
           platform: 'Kick',
+          channel: channel,
           sender: messageData.sender.username,
           message: messageData.content,
           timestamp: new Date(messageData.created_at),
@@ -87,14 +103,21 @@ class StreamManager {
         }
       });
 
-      socket.on("disconnect", () => {
-        console.log("Disconnected from Kick chat");
+      socket.on('disconnect', () => {
+        console.log(`Disconnected from Kick chat for ${channel}`);
       });
 
-      this.kickConnected = true;
-
+      this.kickSockets[channel] = socket;
     } catch (error) {
       console.error('Error connecting to Kick:', error);
+    }
+  }
+
+  disconnectKick(channel) {
+    if (this.kickSockets[channel]) {
+      console.log(`Disconnecting from Kick channel: ${channel}`);
+      this.kickSockets[channel].disconnect();
+      delete this.kickSockets[channel];
     }
   }
 

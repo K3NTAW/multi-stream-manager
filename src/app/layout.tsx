@@ -27,12 +27,12 @@ export default function RootLayout({
           fontMono.variable
         )}
       >
-        <SessionProvider>
-          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <SessionProvider>
             <div className="flex flex-col h-full">{children}</div>
             <Toaster />
-          </ThemeProvider>
-        </SessionProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
