@@ -1,5 +1,5 @@
 import { getServerSession } from "next-auth";
-import { authOptions } from "../api/auth/[...nextauth]/route";
+import { authOptions } from "../../../server/lib/auth";
 import { Navbar } from "@/components/navbar";
 import { SignInButton } from "@/components/auth-buttons";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
