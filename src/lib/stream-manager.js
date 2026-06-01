@@ -1,10 +1,12 @@
 const tmi = require('tmi.js');
 const { io } = require('socket.io-client');
+const { google } = require('googleapis');
 const { env } = require('../../src/lib/env');
 
 class StreamManager {
   twitchClients = {}; // Key: channel, Value: tmi.Client
   kickSockets = {}; // Key: channel, Value: socket
+  youtubeIntervals = {}; // Key: channel, Value: interval ID
   onMessageCallback = null;
 
   constructor() {
@@ -118,6 +120,85 @@ class StreamManager {
       console.log(`Disconnecting from Kick channel: ${channel}`);
       this.kickSockets[channel].disconnect();
       delete this.kickSockets[channel];
+    }
+  }
+
+  async connectYouTube(channel, accessToken) {
+    if (this.youtubeIntervals[channel]) {
+      console.log(`Already polling YouTube chat for: ${channel}`);
+      return;
+    }
+
+    console.log(`Starting YouTube chat polling for: ${channel}`);
+    console.log(`Using YouTube access token: ${accessToken ? 'Exists' : 'Does not exist'}`);
+
+
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
+
+    try {
+      // 1. Get the user's active live stream to find the liveChatId
+      const videoResponse = await youtube.liveBroadcasts.list({
+        part: 'snippet',
+        broadcastStatus: 'active',
+        mine: true,
+      });
+
+      console.log('YouTube API response for live broadcasts:', JSON.stringify(videoResponse.data, null, 2));
+
+
+      const liveBroadcast = videoResponse.data.items?.[0];
+      if (!liveBroadcast || !liveBroadcast.snippet?.liveChatId) {
+        console.log(`No active YouTube stream found for ${channel}.`);
+        return;
+      }
+      const liveChatId = liveBroadcast.snippet.liveChatId;
+      console.log(`Found live chat ID: ${liveChatId}`);
+
+      // 2. Poll for new messages
+      let nextPageToken = undefined;
+      this.youtubeIntervals[channel] = setInterval(async () => {
+        try {
+          const chatResponse = await youtube.liveChatMessages.list({
+            liveChatId,
+            part: 'snippet,authorDetails',
+            pageToken: nextPageToken,
+          });
+
+          console.log(`YouTube chat response for ${liveChatId}:`, JSON.stringify(chatResponse.data, null, 2));
+
+
+          const newMessages = chatResponse.data.items || [];
+          for (const item of newMessages) {
+            const chatMessage = {
+              platform: 'YouTube',
+              channel: channel,
+              sender: item.authorDetails?.displayName || 'anonymous',
+              message: item.snippet?.displayMessage || '',
+              timestamp: new Date(item.snippet?.publishedAt || Date.now()),
+            };
+            if (this.onMessageCallback) {
+              this.onMessageCallback(chatMessage);
+            }
+          }
+
+          nextPageToken = chatResponse.data.nextPageToken;
+        } catch (error) {
+          console.error('Error polling YouTube chat:', error.message);
+          this.disconnectYouTube(channel);
+        }
+      }, 5000); // Poll every 5 seconds
+    } catch (error) {
+      console.error('Error connecting to YouTube:', error.message);
+    }
+  }
+
+  disconnectYouTube(channel) {
+    if (this.youtubeIntervals[channel]) {
+      console.log(`Stopping YouTube chat polling for: ${channel}`);
+      clearInterval(this.youtubeIntervals[channel]);
+      delete this.youtubeIntervals[channel];
     }
   }
 

@@ -1,47 +1,69 @@
-import { sql } from "../db";
+import "dotenv/config";
+import { pgPool } from "../db";
 
 async function setup() {
-	await sql`
-        CREATE TABLE auth_user (
-            id TEXT NOT NULL PRIMARY KEY,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
-        );
-    `;
+  await pgPool.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`);
 
-	await sql`
-        CREATE TABLE auth_session (
-            id TEXT NOT NULL PRIMARY KEY,
-            expires_at TIMESTAMPTZ NOT NULL,
-            user_id TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES auth_user(id)
-        );
-    `;
+  await pgPool.query(`
+    CREATE TABLE "users" (
+      "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+      "name" text,
+      "email" text,
+      "emailVerified" timestamp with time zone,
+      "image" text,
+      "password" text,
+      CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+    );
+  `);
 
-	await sql`
-		CREATE TABLE auth_key (
-			id TEXT NOT NULL PRIMARY KEY,
-			user_id TEXT NOT NULL,
-			primary_key BOOLEAN NOT NULL,
-			hashed_password TEXT,
-			expires BIGINT,
-			FOREIGN KEY (user_id) REFERENCES auth_user(id)
-		);
-	`;
+  await pgPool.query(`
+    CREATE TABLE "accounts" (
+      "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+      "userId" uuid NOT NULL,
+      "type" text NOT NULL,
+      "provider" text NOT NULL,
+      "providerAccountId" text NOT NULL,
+      "refresh_token" text,
+      "access_token" text,
+      "expires_at" integer,
+      "token_type" text,
+      "scope" text,
+      "id_token" text,
+      "session_state" text,
+      CONSTRAINT "accounts_pkey" PRIMARY KEY ("id")
+    );
+  `);
 
-	await sql`
-		CREATE TABLE chat_messages (
-			id SERIAL PRIMARY KEY,
-			platform TEXT NOT NULL,
-			channel TEXT NOT NULL,
-			sender TEXT NOT NULL,
-			message TEXT NOT NULL,
-			timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
-		);
-	`;
+  await pgPool.query(`
+    CREATE TABLE "sessions" (
+      "id" uuid NOT NULL DEFAULT gen_random_uuid(),
+      "sessionToken" text NOT NULL,
+      "userId" uuid NOT NULL,
+      "expires" timestamp with time zone NOT NULL,
+      CONSTRAINT "sessions_pkey" PRIMARY KEY ("id")
+    );
+  `);
 
-	console.log("Database setup complete.");
-	process.exit(0);
+  await pgPool.query(`
+    CREATE TABLE "verification_tokens" (
+      "identifier" text NOT NULL,
+      "token" text NOT NULL,
+      "expires" timestamp with time zone NOT NULL
+    );
+  `);
+
+  await pgPool.query(`
+    ALTER TABLE "accounts"
+      ADD CONSTRAINT "accounts_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE cascade ON UPDATE cascade;
+  `);
+
+  await pgPool.query(`
+    ALTER TABLE "sessions"
+      ADD CONSTRAINT "sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users" ("id") ON DELETE cascade ON UPDATE cascade;
+  `);
+
+  console.log("Database setup complete.");
+  process.exit(0);
 }
 
 setup(); 

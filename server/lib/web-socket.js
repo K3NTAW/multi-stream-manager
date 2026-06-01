@@ -4,7 +4,7 @@ const { streamManager } = require("../../src/lib/stream-manager");
 function initializeWebSocket() {
   const wss = new WebSocketServer({ port: 3001 });
 
-  wss.on("connection", (ws, req) => {
+  wss.on("connection", async (ws, req) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const channel = url.searchParams.get("channel");
 
@@ -20,7 +20,26 @@ function initializeWebSocket() {
     // Connect to this channel if it's the first client for it
     if (![...wss.clients].some((c) => c !== ws && c.channel === channel)) {
       console.log(`First client for ${channel}, connecting to streams...`);
-      streamManager.connectTwitch(channel, "any-oauth-token");
+
+      // Fetch the session to get access tokens
+      try {
+        const sessionRes = await fetch("http://localhost:3000/api/get-session");
+        const session = await sessionRes.json();
+
+        if (session?.twitchAccessToken) {
+          streamManager.connectTwitch(channel, session.twitchAccessToken);
+        }
+        if (session?.googleAccessToken) {
+          streamManager.connectYouTube(channel, session.googleAccessToken);
+        }
+        
+        if (!session?.twitchAccessToken && !session?.googleAccessToken) {
+          console.log("No active session found, cannot connect to streams.");
+        }
+      } catch (error) {
+        console.error("Error fetching session:", error);
+      }
+      
       streamManager.connectKick(channel);
     }
 
@@ -31,6 +50,7 @@ function initializeWebSocket() {
         console.log(`Last client for ${channel} disconnected, closing streams.`);
         streamManager.disconnectTwitch(channel);
         streamManager.disconnectKick(channel);
+        streamManager.disconnectYouTube(channel);
       }
     });
   });

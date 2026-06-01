@@ -108,4 +108,4 @@ export function ChatMessage({ message }: { message: ChatMessageType }) {
       />
     </div>
   );
-} 
+}

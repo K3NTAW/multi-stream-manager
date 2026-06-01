@@ -5,6 +5,7 @@ import { SignInButton } from "@/components/auth-buttons";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { pgPool } from "../../../server/lib/db";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -20,6 +21,9 @@ export default async function SettingsPage() {
   }
 
   const { user } = session;
+
+  const accountsQuery = await pgPool.query('SELECT provider FROM accounts WHERE "userId" = $1', [user.id]);
+  const connectedProviders = accountsQuery.rows.map((row: { provider: string }) => row.provider);
 
   return (
     <>
@@ -59,7 +63,7 @@ export default async function SettingsPage() {
               {/* Twitch Connection */}
               <div className="flex items-center justify-between">
                 <span className="text-lg font-medium">Twitch</span>
-                {session.user.image?.includes('twitch') ? (
+                {connectedProviders.includes('twitch') ? (
                   <span className="text-sm text-green-500">Connected</span>
                 ) : (
                   <SignInButton provider="twitch" />
@@ -69,7 +73,7 @@ export default async function SettingsPage() {
               {/* YouTube Connection */}
               <div className="flex items-center justify-between">
                 <span className="text-lg font-medium">YouTube</span>
-                {session.user.image?.includes('google') ? (
+                {connectedProviders.includes('google') ? (
                   <span className="text-sm text-green-500">Connected</span>
                 ) : (
                   <SignInButton provider="google" />
